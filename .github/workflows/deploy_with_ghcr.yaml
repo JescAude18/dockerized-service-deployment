@@ -1,0 +1,35 @@
+---
+
+name: Dockerized Nodejs Service Deployment with Docker Hub
+
+on:
+  push:
+    branches:
+      - 'main'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prepare_image:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Login to Github Container Registry (GHCR)
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/dockerized-nodejs-service:${{ github.sha }}
