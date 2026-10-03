@@ -1,6 +1,6 @@
 ---
 
-name: Dockerized Nodejs Service Deployment with Docker Hub
+name: Dockerized Nodejs Service Deployment with GHCR
 
 on:
   push:
