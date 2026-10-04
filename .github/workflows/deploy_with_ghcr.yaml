@@ -71,6 +71,7 @@ jobs:
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             envs: APP_USERNAME, APP_PASSWORD, SECRET_MESSAGE, IMAGE_NAME
             script: |
-              sudo docker run --name dockerized-nodejs-service -e APP_USERNAME="$APP_USERNAME" \
+              sudo docker rm -f dockerized-nodejs-service || true
+              sudo docker run -d --name dockerized-nodejs-service -e APP_USERNAME="$APP_USERNAME" \
               -e APP_PASSWORD="$APP_PASSWORD" -e SECRET_MESSAGE="$SECRET_MESSAGE" \
               -p 3000:3000 "$IMAGE_NAME":${{ github.sha }}
