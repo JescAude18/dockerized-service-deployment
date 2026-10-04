@@ -53,8 +53,8 @@ jobs:
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             envs: GHCR_USERNAME, GHCR_TOKEN, IMAGE_NAME
             script: |
-              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-              docker pull "$IMAGE_NAME":${{ github.sha }}
+              echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+              sudo docker pull "$IMAGE_NAME":${{ github.sha }}
 
         - name: Run Nodejs Container on the VM
           uses: appleboy/ssh-action@v1
@@ -69,6 +69,6 @@ jobs:
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             envs: APP_USERNAME, APP_PASSWORD, SECRET_MESSAGE, IMAGE_NAME
             script: |
-              docker run --name dockerized-nodejs-service -e APP_USERNAME="$APP_USERNAME" \
+              sudo docker run --name dockerized-nodejs-service -e APP_USERNAME="$APP_USERNAME" \
               -e APP_PASSWORD="$APP_PASSWORD" -e SECRET_MESSAGE="$SECRET_MESSAGE" \
               -p 3000:3000 "$IMAGE_NAME":${{ github.sha }}

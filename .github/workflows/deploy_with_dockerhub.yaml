@@ -46,8 +46,8 @@ jobs:
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             envs: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
             script: |
-              echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-              docker pull "$DOCKERHUB_USERNAME"/dockerized-nodejs-service:${{ github.sha }}
+              echo "$DOCKERHUB_TOKEN" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+              sudo docker pull "$DOCKERHUB_USERNAME"/dockerized-nodejs-service:${{ github.sha }}
         
         - name: Run Nodejs Container on the VM
           uses: appleboy/ssh-action@v1
@@ -62,6 +62,6 @@ jobs:
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             envs: APP_USERNAME, APP_PASSWORD, SECRET_MESSAGE, DOCKERHUB_USERNAME
             script: |
-              docker run --name dockerized-nodejs-service -e APP_USERNAME="$APP_USERNAME" \
+              sudo docker run --name dockerized-nodejs-service -e APP_USERNAME="$APP_USERNAME" \
               -e APP_PASSWORD="$APP_PASSWORD" -e SECRET_MESSAGE="$SECRET_MESSAGE" \
               -p 3000:3000 "$DOCKERHUB_USERNAME"/dockerized-nodejs-service:${{ github.sha }}
