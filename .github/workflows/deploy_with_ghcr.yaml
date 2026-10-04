@@ -28,8 +28,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Set image name # should be in lowercase
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dockerized-nodejs-service" >> "$GITHUB_ENV"
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/dockerized-nodejs-service:${{ github.sha }}
+          tags: ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
