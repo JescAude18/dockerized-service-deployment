@@ -8,6 +8,8 @@ on:
       - 'main'
 
   workflow_dispatch:
+env:
+  IMAGE_NAME: ghcr.io/jescaude18/dockerized-nodejs-service
 
 permissions:
   contents: read
@@ -28,15 +30,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Set image name # should be in lowercase
-        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dockerized-nodejs-service" >> "$GITHUB_ENV"
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          tags: "${{ env.IMAGE_NAME }}:${{ github.sha }}"
 
   deploy:
+      needs: prepare_image
+
       runs-on: ubuntu-24.04
 
       steps:
@@ -54,7 +56,7 @@ jobs:
             envs: GHCR_USERNAME, GHCR_TOKEN, IMAGE_NAME
             script: |
               echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-              sudo docker pull "$IMAGE_NAME":${{ github.sha }}
+              sudo docker pull "$IMAGE_NAME:${{ github.sha }}"
 
         - name: Run Nodejs Container on the VM
           uses: appleboy/ssh-action@v1

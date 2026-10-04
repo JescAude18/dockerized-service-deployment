@@ -9,6 +9,9 @@ on:
 
   workflow_dispatch:
 
+env:
+  IMAGE_NAME: docker.io/jescaude18/dockerized-nodejs-service
+
 jobs:
   prepare_image:
     runs-on: ubuntu-24.04
@@ -29,8 +32,10 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           push: true
-          tags: docker.io/${{ vars.DOCKERHUB_USERNAME }}/dockerized-nodejs-service:${{ github.sha }}
+          tags: "${{ env.IMAGE_NAME }}:${{ github.sha }}"
   deploy:
+      needs: prepare_image
+
       runs-on: ubuntu-24.04
 
       steps:
@@ -40,14 +45,15 @@ jobs:
           env:
             DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
             DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+            IMAGE_NAME: ${{ env.IMAGE_NAME }}
           with:
             host: ${{ vars.SERVER_IP }}
             username: ${{ vars.SERVER_USER }}
             key: ${{ secrets.SSH_PRIVATE_KEY }}
-            envs: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+            envs: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, IMAGE_NAME
             script: |
               echo "$DOCKERHUB_TOKEN" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-              sudo docker pull "$DOCKERHUB_USERNAME"/dockerized-nodejs-service:${{ github.sha }}
+              sudo docker pull "$IMAGE_NAME:${{ github.sha }}"
         
         - name: Run Nodejs Container on the VM
           uses: appleboy/ssh-action@v1
@@ -55,13 +61,13 @@ jobs:
             APP_USERNAME: ${{ secrets.APP_USERNAME }}
             APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
             SECRET_MESSAGE: ${{ secrets.SECRET_MESSAGE }}
-            DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+            IMAGE_NAME: ${{ env.IMAGE_NAME }}
           with:
             host: ${{ vars.SERVER_IP }}
             username: ${{ vars.SERVER_USER }}
             key: ${{ secrets.SSH_PRIVATE_KEY }}
-            envs: APP_USERNAME, APP_PASSWORD, SECRET_MESSAGE, DOCKERHUB_USERNAME
+            envs: APP_USERNAME, APP_PASSWORD, SECRET_MESSAGE, IMAGE_NAME
             script: |
               sudo docker run --name dockerized-nodejs-service -e APP_USERNAME="$APP_USERNAME" \
               -e APP_PASSWORD="$APP_PASSWORD" -e SECRET_MESSAGE="$SECRET_MESSAGE" \
-              -p 3000:3000 "$DOCKERHUB_USERNAME"/dockerized-nodejs-service:${{ github.sha }}
+              -p 3000:3000 "$IMAGE_NAME:${{ github.sha }}"
