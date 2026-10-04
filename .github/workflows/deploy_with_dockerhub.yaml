@@ -2,6 +2,8 @@
 
 name: Dockerized Nodejs Service Deployment with Docker Hub
 
+# Deploy automatically after changes reach main; workflow_dispatch also allows
+# an operator to trigger the same build and deployment manually.
 on:
   push:
     branches:
@@ -9,31 +11,47 @@ on:
 
   workflow_dispatch:
 
+# Workflow-level variables are available to steps running on GitHub-hosted
+# runners. They are not automatically created in the VM's shell environment.
+# The image is tagged with the full commit SHA below. This avoids deploying a
+# moving tag such as "latest" and makes every deployment traceable to one commit.
 env:
   IMAGE_NAME: docker.io/jescocker/dockerized-nodejs-service
 
 jobs:
   prepare_image:
+    # GitHub-hosted runner used only to build and publish the image.
     runs-on: ubuntu-24.04
 
     steps:
-
       - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:
-          registry: docker.io # Don't need this line because Docker is default value for this action
+          # This value is used by the login action on the GitHub-hosted runner.
+          # docker.io is the action's default registry; it is kept explicit to
+          # make the target registry clear to readers.
+          registry: docker.io
+          # These expressions are resolved by GitHub Actions and are available
+          # to this step on the runner; they are not VM environment variables.
+          # Use a Docker Hub access token rather than the account password.
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
+        # Buildx provides the builder used by docker/build-push-action.
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           push: true
+          # env.IMAGE_NAME is read on the runner while the action is building
+          # and publishing; it is not yet available on the remote VM.
+          # The image is published before the deployment job starts.
           tags: "${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
   deploy:
+      # Do not connect to the VM until the image build and push have succeeded.
       needs: prepare_image
 
       runs-on: ubuntu-24.04
@@ -41,32 +59,50 @@ jobs:
       steps:
 
         - name: Pull Nodejs Application Image Built
+          # These values first exist in the SSH action's runner process. The
+          # envs list explicitly forwards them into the remote SSH shell; without
+          # it, they would not be available as variables on the VM.
           uses: appleboy/ssh-action@v1
           env:
+            # Read from GitHub repository configuration, then forwarded to VM.
             DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+            # Read from GitHub Actions secrets, then forwarded to VM.
             DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+            # Workflow-level value copied into this step, then forwarded to VM.
             IMAGE_NAME: ${{ env.IMAGE_NAME }}
           with:
             host: ${{ vars.SERVER_IP }}
             username: ${{ vars.SERVER_USER }}
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             envs: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, IMAGE_NAME
+            # These variables are now in the VM shell because they were listed
+            # in envs above. Authenticate on the VM, then pull the exact image.
             script: |
               echo "$DOCKERHUB_TOKEN" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
               sudo docker pull "$IMAGE_NAME:${{ github.sha }}"
         
         - name: Run Nodejs Container on the VM
+          # The secrets are available to this SSH action on the runner first.
+          # envs forwards them to the VM shell, but they do not become permanent
+          # VM variables; Docker -e passes them to the container at runtime.
           uses: appleboy/ssh-action@v1
           env:
+            # GitHub Actions secrets copied from the runner context to the VM
+            # only through the envs list below.
             APP_USERNAME: ${{ secrets.APP_USERNAME }}
             APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
             SECRET_MESSAGE: ${{ secrets.SECRET_MESSAGE }}
+            # This workflow-level value is also forwarded to the VM shell.
             IMAGE_NAME: ${{ env.IMAGE_NAME }}
           with:
             host: ${{ vars.SERVER_IP }}
             username: ${{ vars.SERVER_USER }}
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             envs: APP_USERNAME, APP_PASSWORD, SECRET_MESSAGE, IMAGE_NAME
+            # Replace the previous container. "|| true" keeps the deployment
+            # idempotent when this is the first deployment and it does not exist.
+            # Run detached. The -e options move the values from the VM shell
+            # into the container environment, and -p exposes port 3000.
             script: |
               sudo docker rm -f dockerized-nodejs-service || true
               sudo docker run -d --name dockerized-nodejs-service -e APP_USERNAME="$APP_USERNAME" \
